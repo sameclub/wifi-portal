@@ -1,0 +1,7 @@
+{
+  "name": "WifiPortal",
+  "version": "1.0.0",
+  "description": "Shared WiFi provisioning captive portal for S3AI firmware projects",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}
