@@ -72,7 +72,7 @@ document.documentElement.style.setProperty('--ag','rgba('+r+','+g+','+b+',.4)');
 <p class="ft">keep phone connected to device hotspot<br><span class="ac">NTP auto-sync after connection</span></p></main>
 <script>
 var list=document.getElementById('networks'),ssid=document.getElementById('ssid'),password=document.getElementById('password'),status=document.getElementById('status'),refresh=document.getElementById('refresh'),connect=document.getElementById('connect'),scanning=false,submitting=false;
-function notify(t){status.textContent=t;status.className='st'+(t.indexOf('fail')>=0||t.indexOf('error')>=0?' er':t.indexOf('saved')>=0||t.indexOf('success')>=0?' ok':'');}
+function notify(t){status.textContent=t;status.className='st'+(t.indexOf('fail')>=0||t.indexOf('error')>=0||t.indexOf('\u5931\u8d25')>=0?' er':t.indexOf('saved')>=0||t.indexOf('success')>=0||t.indexOf('\u6210\u529f')>=0?' ok':'');}
 function selectNetwork(n){ssid.value=n.ssid;ssid.readOnly=true;password.value='';password.required=n.secure;password.minLength=n.secure?8:0;password.placeholder=n.secure?'enter password':'open network';var rows=list.querySelectorAll('button');for(var i=0;i<rows.length;i++)rows[i].setAttribute('aria-pressed',String(rows[i].dataset.ssid===n.ssid));if(n.secure)password.focus();}
 document.getElementById('manual').onclick=function(){ssid.readOnly=false;ssid.value='';ssid.placeholder='enter hidden SSID';password.required=false;password.minLength=0;var rows=list.querySelectorAll('button');for(var i=0;i<rows.length;i++)rows[i].setAttribute('aria-pressed','false');ssid.focus();};
 document.getElementById('show-pw').onclick=function(){var v=password.type==='password';password.type=v?'text':'password';this.textContent=v?'hide':'show';};

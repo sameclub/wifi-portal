@@ -175,7 +175,6 @@ void WifiPortal::_setupHandlers() {
 bool WifiPortal::_startAccessPoint() {
     _apName = _config.apName;
     _apPassword = _config.apPassword;
-    _formToken = String(esp_random(), HEX) + String(esp_random(), HEX);
 
     WiFi.persistent(false);
     // AP_STA rather than AP: scanning needs the station interface, even though
@@ -206,6 +205,9 @@ void WifiPortal::startProvisioning() {
     // every scan and reconnect, which drops the phone. Park the station first.
     if (wifiBusy) { WiFi.scanDelete(); wifiBusy = false; wifiCount = 0; }
     WiFi.disconnect(false, false);
+    // One token per session: the AP restarts after a failed attempt, and the
+    // phone's open page must still be able to resubmit.
+    _formToken = String(esp_random(), HEX) + String(esp_random(), HEX);
     if (!_startAccessPoint()) return;
     _provisioning = true;
     _portalState = "WAIT FOR PHONE";
@@ -253,7 +255,7 @@ void WifiPortal::_finishVerification(bool connected) {
     // this fixed hotspot, so it reconnects on its own and sees the error.
     WiFi.disconnect(false, false);
     _provisioning = _startAccessPoint();
-    _portalState = "CONNECT FAILED";
+    if (_provisioning) _portalState = "CONNECT FAILED";
 }
 
 void WifiPortal::update() {
