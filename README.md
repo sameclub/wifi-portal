@@ -23,7 +23,7 @@ treats a failed attempt as recoverable:
   error, instead of the user having to hunt for a vanished AP.
 - **NVS is only written after a connection succeeds**, so a bad attempt never
   destroys working credentials.
-- **Saved network unreachable for 60 s → the portal opens once by itself**, so a
+- **Saved networks unreachable for at least 60 s and one full retry cycle → the portal opens once by itself**, so a
   device carried to a new location is recoverable without a reset.
 
 ## Install
@@ -112,8 +112,8 @@ app may prefer `0`.
 | `isProvisioning()` | The hotspot is up |
 | `isVerifying()` | AP is down while new credentials are being tried |
 | `isConnected()` | Station is associated and has an IP |
-| `hasCredentials()` | NVS holds an SSID |
-| `ssid()` | Stored SSID |
+| `hasCredentials()` | At least one saved network |
+| `ssid()` | Current connection target SSID |
 | `apName()` / `apPassword()` | Live hotspot details, for display |
 | `state()` | Human-readable portal state |
 
@@ -124,7 +124,7 @@ app may prefer `0`.
 | Address | `192.168.4.1` |
 | Channel | fixed at 1 |
 | Timeout | 5 min idle, configurable |
-| NVS record | `{ char ssid[33]; char password[64]; }` |
+| NVS record | Versioned list of up to 8 SSID/password records; legacy single-record read supported |
 
 Connect the phone to the hotspot; the captive-portal prompt opens the page, or
 browse to `192.168.4.1`. Pick a network, enter the password, save.
