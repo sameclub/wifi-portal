@@ -47,6 +47,7 @@ String WifiPortal::_renderPage() {
 bool WifiPortal::_loadCredentials() {
     Preferences prefs;
     if (!prefs.begin(_config.nvsNamespace, true)) return false;
+    _networks = {};
     NetworkStore stored = {};
     if (prefs.getBytesLength("networks") == sizeof(stored) &&
         prefs.getBytes("networks", &stored, sizeof(stored)) == sizeof(stored) &&
@@ -113,7 +114,13 @@ bool WifiPortal::isConnected() const {
     return WiFi.status() == WL_CONNECTED;
 }
 
+bool WifiPortal::isConnecting() const {
+    return !_provisioning && hasCredentials() && !isConnected() &&
+        millis() - _offlineSince <= uint32_t(_networks.count) * RECONNECT_INTERVAL_MS;
+}
+
 bool WifiPortal::begin() {
+    _offlineSince = millis();
     if (!_loadCredentials()) {
         startProvisioning();
         return false;
@@ -173,7 +180,7 @@ void WifiPortal::_setupHandlers() {
             server.send(403, "text/plain", "Token mismatch, reload page.");
             return;
         }
-        if (wifiBusy) {
+        if (wifiBusy || self->_savePending) {
             server.send(409, "text/plain; charset=utf-8", "Scanning, retry shortly.");
             return;
         }

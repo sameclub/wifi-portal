@@ -30,6 +30,8 @@ public:
 
     bool isProvisioning() const { return _provisioning; }
     bool isConnected() const;
+    // Keep automatic sleep from interrupting the first full failover cycle.
+    bool isConnecting() const;
     bool hasCredentials() const { return _ssid.length() > 0; }
     const String &ssid() const { return _ssid; }
     const String &apName() const { return _apName; }
