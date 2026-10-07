@@ -20,7 +20,7 @@ constexpr int PORTAL_AP_CHANNEL = 1;
 constexpr uint32_t VERIFY_TIMEOUT_MS = 20000;
 // Let the browser receive the response page before the AP goes down.
 constexpr uint32_t SAVE_RESPONSE_GRACE_MS = 700;
-constexpr uint32_t RECONNECT_INTERVAL_MS = 30000;
+constexpr uint32_t RECONNECT_INTERVAL_MS = 10000;
 }
 
 WifiPortal::WifiPortal(const WifiPortalConfig &config) : _config(config) {}
@@ -47,35 +47,65 @@ String WifiPortal::_renderPage() {
 bool WifiPortal::_loadCredentials() {
     Preferences prefs;
     if (!prefs.begin(_config.nvsNamespace, true)) return false;
-    SavedNetwork net = {};
-    if (prefs.getBytes("network", &net, sizeof(net)) != sizeof(net)) return false;
-    if (net.ssid[sizeof(net.ssid) - 1] != 0) return false;
-    if (net.password[sizeof(net.password) - 1] != 0) return false;
-    if (strlen(net.ssid) == 0) return false;
-    _ssid = net.ssid;
-    _password = net.password;
+    NetworkStore stored = {};
+    if (prefs.getBytesLength("networks") == sizeof(stored) &&
+        prefs.getBytes("networks", &stored, sizeof(stored)) == sizeof(stored) &&
+        stored.version == 1 && stored.count > 0 && stored.count <= MAX_NETWORKS) {
+        bool valid = true;
+        for (uint32_t i = 0; i < stored.count; ++i) {
+            const Network &net = stored.networks[i];
+            if (!net.ssid[0] || net.ssid[32] || net.password[63]) valid = false;
+        }
+        if (valid) _networks = stored;
+    }
+    if (!_networks.count) {
+        SavedNetwork net = {};
+        if (prefs.getBytesLength("network") != sizeof(net) ||
+            prefs.getBytes("network", &net, sizeof(net)) != sizeof(net) ||
+            !net.ssid[0] || net.ssid[32] || net.password[63]) return false;
+        _networks.version = 1;
+        _networks.count = 1;
+        memcpy(&_networks.networks[0], &net, sizeof(net));
+    }
+    _networkIndex = 0;
+    _ssid = _networks.networks[0].ssid;
+    _password = _networks.networks[0].password;
     return true;
 }
 
 bool WifiPortal::_saveCredentials() {
+    NetworkStore next = _networks;
+    next.version = 1;
+    uint32_t index = next.count;
+    for (uint32_t i = 0; i < next.count; ++i) {
+        if (_ssid == next.networks[i].ssid) { index = i; break; }
+    }
+    // Newest additions/updates first; at capacity evict the oldest entry.
+    if (index == next.count && next.count < MAX_NETWORKS) ++next.count;
+    if (index >= MAX_NETWORKS) index = MAX_NETWORKS - 1;
+    for (uint32_t i = index; i > 0; --i) next.networks[i] = next.networks[i - 1];
+    next.networks[0] = {};
+    strncpy(next.networks[0].ssid, _ssid.c_str(), 32);
+    strncpy(next.networks[0].password, _password.c_str(), 63);
     Preferences prefs;
     if (!prefs.begin(_config.nvsNamespace, false)) return false;
-    SavedNetwork net = {};
-    strncpy(net.ssid, _ssid.c_str(), sizeof(net.ssid) - 1);
-    strncpy(net.password, _password.c_str(), sizeof(net.password) - 1);
-    size_t written = prefs.putBytes("network", &net, sizeof(net));
-    if (written != sizeof(net)) return false;
-    SavedNetwork verify = {};
-    prefs.getBytes("network", &verify, sizeof(verify));
-    return memcmp(&net, &verify, sizeof(net)) == 0;
+    if (prefs.putBytes("networks", &next, sizeof(next)) != sizeof(next)) return false;
+    NetworkStore verify = {};
+    if (prefs.getBytes("networks", &verify, sizeof(verify)) != sizeof(verify) ||
+        memcmp(&next, &verify, sizeof(next)) != 0) return false;
+    _networks = next;
+    _networkIndex = 0;
+    prefs.remove("network");
+    return true;
 }
 
 void WifiPortal::_connectWifi() {
     if (_ssid.isEmpty()) return;
     WiFi.persistent(false);
     WiFi.mode(_provisioning ? WIFI_AP_STA : WIFI_STA);
-    WiFi.setAutoReconnect(true);
+    WiFi.setAutoReconnect(false);
     _lastConnect = millis();
+    WiFi.disconnect(false, false);
     WiFi.begin(_ssid.c_str(), _password.c_str());
 }
 
@@ -235,7 +265,7 @@ void WifiPortal::_beginVerification() {
     _stopAccessPoint();
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(false, false);
-    WiFi.setAutoReconnect(true);
+    WiFi.setAutoReconnect(false);
     WiFi.begin(_pendingSsid.c_str(), _pendingPassword.c_str());
     _lastConnect = millis();
 }
@@ -288,6 +318,11 @@ void WifiPortal::update() {
     }
 
     if (!_provisioning && hasCredentials() && !isConnected() && millis() - _lastConnect > RECONNECT_INTERVAL_MS) {
+        if (_networks.count) {
+            _networkIndex = (_networkIndex + 1) % _networks.count;
+            _ssid = _networks.networks[_networkIndex].ssid;
+            _password = _networks.networks[_networkIndex].password;
+        }
         _connectWifi();
     }
 
@@ -298,7 +333,7 @@ void WifiPortal::update() {
     } else if (!_provisioning && hasCredentials()) {
         if (_offlineSince == 0) _offlineSince = millis();
         else if (!_autoPortalUsed && _config.autoPortalMs &&
-                 millis() - _offlineSince > _config.autoPortalMs) {
+                 millis() - _offlineSince > max(_config.autoPortalMs, uint32_t(_networks.count) * RECONNECT_INTERVAL_MS)) {
             _autoPortalUsed = true;
             startProvisioning();
         }

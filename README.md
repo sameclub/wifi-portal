@@ -139,3 +139,7 @@ from the core; no external dependencies.
 MIT. Portal page styles and the Wi-Fi icon are adapted from
 [78/esp-wifi-connect](https://github.com/78/esp-wifi-connect), also MIT. See
 [LICENSE](LICENSE).
+
+## Saved networks
+
+Stores up to 8 networks per app. Verified additions/updates move to the front; at capacity the oldest entry is replaced. Boot tries the newest entry first, then cycles through saved networks every 10 seconds while offline. A connected station stays on its network. Legacy single-network credentials load automatically. Failed verification never changes saved networks. The automatic portal waits at least one complete network cycle.

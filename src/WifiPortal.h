@@ -40,6 +40,11 @@ public:
 
 private:
     WifiPortalConfig _config;
+    static constexpr uint8_t MAX_NETWORKS = 8;
+    struct Network { char ssid[33]; char password[64]; };
+    struct NetworkStore { uint32_t version; uint32_t count; Network networks[MAX_NETWORKS]; };
+    NetworkStore _networks = {};
+    uint8_t _networkIndex = 0;
     String _ssid, _password;
     String _pendingSsid, _pendingPassword;
     String _apName, _apPassword, _formToken;
